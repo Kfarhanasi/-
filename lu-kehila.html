@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>לוח הקהילה - כפר הנשיא</title>
+<style>
+  :root{
+    --wood-dark:#4a3728;
+    --wood:#6b4e37;
+    --wood-light:#8a6647;
+    --paper-yellow:#f2dfa0;
+    --paper-mint:#c9dcc4;
+    --paper-peach:#f0cdb0;
+    --paper-sky:#c3d6dd;
+    --paper-rose:#e7c9cf;
+    --paper-kraft:#e3cfa5;
+    --ink:#3a2f22;
+    --ink-soft:#6b5c47;
+    --pin-red:#a8402f;
+    --pin-brass:#b08d3e;
+    --accent:#3d5c42;
+    --accent-dark:#2c4330;
+    --paper-shadow: rgba(0,0,0,0.35);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+    background:
+      repeating-linear-gradient(90deg, var(--wood) 0px, var(--wood) 3px, var(--wood-dark) 3px, var(--wood-dark) 4px),
+      linear-gradient(var(--wood-light), var(--wood));
+    background-blend-mode: multiply;
+    min-height:100vh;
+    color: var(--ink);
+    padding: 0 0 60px 0;
+  }
+
+  header{ text-align:center; padding: 34px 20px 20px; position:relative; }
+  .board-title{
+    display:inline-block; background: var(--paper-kraft); color: var(--ink);
+    font-family: Georgia, 'Times New Roman', serif; font-size: clamp(20px, 4vw, 30px);
+    font-weight:700; padding: 14px 30px; border-radius: 3px;
+    box-shadow: 0 6px 14px var(--paper-shadow), 0 2px 0 rgba(255,255,255,0.15) inset;
+    transform: rotate(-1.2deg); position:relative;
+  }
+  .board-title::before{
+    content:""; position:absolute; top:-9px; right:50%; transform:translateX(50%);
+    width:16px; height:16px; border-radius:50%;
+    background: radial-gradient(circle at 35% 30%, #e8b34a, var(--pin-brass));
+    box-shadow: 0 3px 4px rgba(0,0,0,0.5);
+  }
+
+  .question-card{
+    max-width:640px; margin: 22px auto 0; background: rgba(255,255,255,0.92);
+    border-radius: 6px; padding: 20px 24px; box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+  }
+  .question-card .q{ font-size: 17px; font-weight:700; color: var(--ink); line-height:1.5; margin:0; }
+  .how-to{ font-size:13px; color: var(--ink-soft); line-height:1.55; margin-top:12px; }
+  .why-toggle{
+    display:inline-block; margin-top:10px; font-size:12.5px; color: var(--accent);
+    cursor:pointer; text-decoration: underline; background:none; border:none; padding:0; font-family:inherit;
+  }
+  .why-text{
+    display:none; font-size:13px; color: var(--ink-soft); margin-top:10px; line-height:1.6;
+    border-top: 1px dashed rgba(0,0,0,0.15); padding-top:10px;
+  }
+  .why-text.open{ display:block; }
+
+  .toolbar{
+    max-width: 1100px; margin: 22px auto 18px; padding: 0 20px;
+    display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;
+  }
+  .tabs{ display:flex; gap:8px; }
+  .tab-btn{
+    background: rgba(255,255,255,0.12); color:#f1e7d6; border:1px solid rgba(255,255,255,0.25);
+    padding:8px 16px; border-radius:20px; font-size:13.5px; cursor:pointer; transition: all .15s;
+  }
+  .tab-btn.active{ background: var(--paper-kraft); color: var(--ink); border-color: transparent; font-weight:600; }
+  .add-btn{
+    background: var(--accent); color:#fff; border:none; padding:11px 22px; border-radius: 22px;
+    font-size:14.5px; font-weight:600; cursor:pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    transition: transform .12s, background .15s; display:flex; align-items:center; gap:8px;
+  }
+  .add-btn:hover{ background: var(--accent-dark); transform: translateY(-1px); }
+
+  .board{ max-width:1100px; margin: 0 auto; padding: 10px 20px 20px; columns: 4 260px; column-gap: 22px; }
+  @media (max-width:700px){ .board{ columns: 1 260px; } }
+
+  .note{
+    break-inside: avoid; margin-bottom: 22px; padding: 22px 18px 16px; border-radius: 2px;
+    position:relative; box-shadow: 0 8px 16px var(--paper-shadow); font-size: 15px; line-height: 1.55;
+    color: var(--ink); animation: dropIn .35s ease-out;
+  }
+  @keyframes dropIn{ from{ opacity:0; transform: translateY(-14px); } }
+  .note::before{
+    content:""; position:absolute; top:-8px; right:50%; transform:translateX(50%);
+    width:14px; height:14px; border-radius:50%; box-shadow: 0 3px 4px rgba(0,0,0,0.5);
+  }
+  .note.pin-red::before{ background: radial-gradient(circle at 35% 30%, #e05a44, var(--pin-red)); }
+  .note.pin-brass::before{ background: radial-gradient(circle at 35% 30%, #e8b34a, var(--pin-brass)); }
+  .note.pin-green::before{ background: radial-gradient(circle at 35% 30%, #7fae7a, var(--accent)); }
+
+  .note-label{ font-size:11px; font-weight:700; color: var(--ink-soft); text-transform:uppercase; letter-spacing:.03em; margin-bottom:4px; }
+  .note-text{ white-space: pre-wrap; word-break: break-word; }
+  .note-divider{ margin: 12px 0; border-top: 1px dashed rgba(0,0,0,0.22); }
+  .note-want .note-label{ color: var(--accent-dark); }
+  .note-want .note-text{ font-style: italic; }
+
+  .vote-row{
+    display:flex; gap:8px; margin-top:14px; padding-top:10px; border-top: 1px dashed rgba(0,0,0,0.18);
+  }
+  .vote-btn{
+    flex:1; display:flex; align-items:center; justify-content:center; gap:6px;
+    background: rgba(255,255,255,0.5); border: 1px solid rgba(0,0,0,0.15); border-radius: 16px;
+    padding: 6px 8px; font-size: 12.5px; cursor:pointer; color: var(--ink); font-weight:600; transition: all .15s;
+  }
+  .vote-btn:hover{ background: rgba(255,255,255,0.85); }
+  .vote-btn.support.active{ background: var(--accent); color:#fff; border-color: var(--accent-dark); }
+  .vote-btn.oppose.active{ background: var(--pin-red); color:#fff; border-color: #7a2e21; }
+  .vote-btn svg{ width:13px; height:13px; }
+
+  .note-time{ font-size:11px; color: var(--ink-soft); text-align:center; margin-top:8px; }
+
+  .comments-toggle{
+    margin-top:10px; font-size:12.5px; color: var(--ink-soft); text-decoration: underline;
+    cursor:pointer; text-align:center; user-select:none;
+  }
+  .comments-panel{
+    display:none; margin-top:10px; background: rgba(0,0,0,0.05); border-radius: 4px; padding: 10px 12px;
+  }
+  .comments-panel.open{ display:block; }
+  .comment-item{
+    font-size:13px; line-height:1.45; padding: 7px 0; border-bottom: 1px dashed rgba(0,0,0,0.12);
+    display:flex; justify-content:space-between; align-items:flex-start; gap:8px;
+  }
+  .comment-item:last-child{ border-bottom:none; }
+  .comment-text{ flex:1; }
+  .del-comment-btn{
+    background:none; border:none; color: var(--pin-red); font-size:12px; cursor:pointer; padding:2px 4px; flex-shrink:0;
+  }
+  .vote-gate{ font-size:12px; color: var(--ink-soft); font-style:italic; padding: 4px 0; }
+  .comment-compose{ display:flex; gap:6px; margin-top:8px; }
+  .comment-compose textarea{
+    flex:1; min-height:36px; resize:vertical; border:1px solid rgba(0,0,0,0.2); border-radius:4px;
+    padding:6px 8px; font-family:inherit; font-size:13px; background: rgba(255,255,255,0.6);
+  }
+  .comment-send{
+    background: var(--accent); color:#fff; border:none; border-radius:14px; padding:0 14px;
+    font-size:12.5px; font-weight:600; cursor:pointer;
+  }
+  .comment-send:disabled{ opacity:0.45; cursor:not-allowed; }
+
+  .empty-state{ text-align:center; color:#f1e7d6; padding: 60px 20px; font-size:15px; max-width:400px; margin:0 auto; }
+
+  .overlay{
+    position:fixed; inset:0; background: rgba(20,14,8,0.55); display:none;
+    align-items:center; justify-content:center; z-index:50; padding:20px;
+  }
+  .overlay.open{ display:flex; }
+  .modal{
+    background: var(--paper-yellow); width: 100%; max-width: 460px; border-radius: 3px;
+    padding: 26px 22px 20px; box-shadow: 0 20px 50px rgba(0,0,0,0.5); position:relative;
+    transform: rotate(-0.6deg); max-height: 90vh; overflow-y:auto;
+  }
+  .modal h3{ margin:0 0 6px; font-family: Georgia, serif; font-size:19px; color: var(--ink); }
+  .modal p{ margin:0 0 12px; font-size:13px; color: var(--ink-soft); line-height:1.5; }
+  .field-label{ font-size:13.5px; font-weight:700; color: var(--ink); margin: 14px 0 6px; }
+  .field-label .opt{ font-weight:400; color: var(--ink-soft); font-size:12px; }
+  .modal textarea{
+    width:100%; min-height:90px; resize:vertical; border: 1px solid rgba(0,0,0,0.25); border-radius: 2px;
+    padding: 12px; font-family: inherit; font-size: 14.5px; background: rgba(255,255,255,0.55); color: var(--ink);
+  }
+  .modal textarea:focus{ outline: 2px solid var(--accent); }
+  .modal-actions{ display:flex; justify-content:flex-end; gap:10px; margin-top:16px; }
+  .btn-cancel{ background:none; border:none; color: var(--ink-soft); font-size:14px; cursor:pointer; padding:9px 6px; }
+  .btn-submit{
+    background: var(--accent); color:#fff; border:none; border-radius:20px;
+    padding:9px 20px; font-size:14px; font-weight:600; cursor:pointer;
+  }
+  .btn-submit:disabled{ opacity:0.5; cursor:not-allowed; }
+  .anon-note{ font-size:12px; color: var(--ink-soft); margin-top:12px; display:flex; gap:6px; align-items:center; }
+
+  .toast{
+    position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(20px);
+    background: var(--ink); color:#fff; padding:12px 22px; border-radius:22px;
+    font-size:14px; opacity:0; transition: all .25s; z-index:60; pointer-events:none;
+  }
+  .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+  .loading{ text-align:center; color:#f1e7d6; padding:40px; font-size:14px; }
+
+  .del-note-btn{
+    position:absolute; top:8px; left:8px; background: rgba(168,64,47,0.9); color:#fff; border:none;
+    border-radius:50%; width:22px; height:22px; font-size:13px; line-height:1; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="board-title">לוח הקהילה — כפר הנשיא</div>
+</header>
+
+<div class="question-card">
+  <p class="q">אילו נושאים ואתגרים בחיי הקיבוץ שלנו דורשים מאיתנו לעצור, לחשוב יחד ולעצב להם פתרונות חדשים לשנים הבאות?</p>
+  <div class="how-to">כתבו פתק חדש בעילום שם מלא, או סמנו תמיכה / אי-תמיכה על פתקים קיימים כדי לפתוח אפשרות להגיב עליהם. כל תגובה נשארת צמודה לנושא המקורי, כך שרואים בבירור על מה מדובר.</div>
+  <button class="why-toggle" id="whyToggle">למה שואלים את זה?</button>
+  <div class="why-text" id="whyText">
+    אנחנו חיים בקיבוץ כקהילה, וברור לנו שיש ערכים, אתגרים ונושאים מהותיים שמשותפים לנו ודורשים חשיבה מחדש. לפני שנתחיל לייצר הסכמות ופתרונות, אנחנו רוצים למפות את הכאבים, וברור לנו שהידע הזה נמצא אצלנו, חברי הקהילה. אז מזמינים אתכם לשתף! הפתקים אנונימיים, ותוכלו לתמוך ולהגיב לנושאים שעלו.<br><br>מבקשים שהשיח בלוח יהיה מכבד ונוגע לנושאים עצמם — לא לתפקוד של אדם זה או אחר.
+  </div>
+</div>
+
+<div class="toolbar">
+  <div class="tabs">
+    <button class="tab-btn active" data-sort="top">הכי נתמך</button>
+    <button class="tab-btn" data-sort="new">חדש ביותר</button>
+  </div>
+  <button class="add-btn" id="openModalBtn">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    להוסיף פתק
+  </button>
+</div>
+
+<div id="boardArea">
+  <div class="loading">טוען את הלוח...</div>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <h3>מה עולה לך?</h3>
+    <p>כתבו בחופשיות. הפתק יעלה ללוח בעילום שם מלא — אין שם, אין זיהוי.</p>
+
+    <div class="field-label">מה הנושא או האתגר שמעסיק אותי?</div>
+    <textarea id="noteInput" maxlength="500" placeholder="לדוגמה: קשה לקבל מידע על החלטות ועד הקהילה..."></textarea>
+
+    <div class="field-label">מה הייתי רוצה לראות במקום? <span class="opt">(רשות)</span></div>
+    <textarea id="wantInput" maxlength="400" placeholder="לדוגמה: מפגש עדכון חודשי פתוח לכולם..."></textarea>
+
+    <div class="anon-note">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a4 4 0 00-4 4v6a4 4 0 008 0V5a4 4 0 00-4-4z" opacity="0.3"/><circle cx="12" cy="12" r="10" stroke-dasharray="3 3"/></svg>
+      לא נאסף שום פרט מזהה
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="cancelBtn">ביטול</button>
+      <button class="btn-submit" id="submitBtn">להעלות ללוח</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div style="text-align:center; padding: 20px 0 0;">
+  <button id="adminLoginBtn" style="background:none; border:none; color: rgba(241,231,214,0.5); font-size:11.5px; cursor:pointer; text-decoration: underline;">כניסת מנהלת</button>
+  <span id="adminStatus" style="color: rgba(241,231,214,0.7); font-size:11.5px; margin-inline-start:8px;"></span>
+</div>
+
+<script>
+// === כתובת ה-Apps Script שלך - להחליף אחרי הפריסה ===
+const API_URL = 'PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE';
+
+const pinClasses = ['pin-red','pin-brass','pin-green'];
+const paperClasses = ['paper-yellow','paper-mint','paper-peach','paper-sky','paper-rose','paper-kraft'];
+
+let notes = [];
+let currentSort = 'top';
+let voteMap = new Map();      // noteId -> 'support' | 'oppose'
+let openComments = new Set(); // noteIds with comment panel open
+let isAdmin = false;
+let voterId = null;
+const ADMIN_PASSWORD = 'כפרהנשיא2026'; // חייב להיות זהה לסיסמה ב-Code.gs
+
+async function apiCall(params){
+  const url = API_URL + '?' + new URLSearchParams(params).toString();
+  const res = await fetch(url);
+  return res.json();
+}
+
+function getVoterId(){
+  let id = localStorage.getItem('kfar-hanasi-voter-id');
+  if(!id){
+    id = 'v_' + Date.now() + '_' + Math.random().toString(36).slice(2,10);
+    localStorage.setItem('kfar-hanasi-voter-id', id);
+  }
+  return id;
+}
+
+function loadMyVotes(){
+  try{
+    const raw = localStorage.getItem('kfar-hanasi-my-votes');
+    voteMap = raw ? new Map(Object.entries(JSON.parse(raw))) : new Map();
+  }catch(e){
+    voteMap = new Map();
+  }
+}
+
+function saveMyVotes(){
+  try{
+    localStorage.setItem('kfar-hanasi-my-votes', JSON.stringify(Object.fromEntries(voteMap)));
+  }catch(e){}
+}
+
+function paperColor(id){
+  let hash = 0;
+  for(let i=0;i<id.length;i++){ hash = (hash*31 + id.charCodeAt(i)) >>> 0; }
+  return {
+    paper: paperClasses[hash % paperClasses.length],
+    pin: pinClasses[hash % pinClasses.length],
+    rotate: (hash % 5) - 2
+  };
+}
+
+function timeAgo(ts){
+  const diff = Date.now() - ts;
+  const min = Math.floor(diff/60000);
+  if(min < 1) return 'ממש עכשיו';
+  if(min < 60) return `לפני ${min} דק'`;
+  const hrs = Math.floor(min/60);
+  if(hrs < 24) return `לפני ${hrs} שע'`;
+  const days = Math.floor(hrs/24);
+  return `לפני ${days} ימים`;
+}
+
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(()=> t.classList.remove('show'), 2200);
+}
+
+async function loadNotes(){
+  try{
+    const data = await apiCall({ action: 'getData' });
+    if(data.error) throw new Error(data.error);
+    const byId = {};
+    (data.notes || []).forEach(n=>{ n.comments = []; byId[n.id] = n; });
+    (data.comments || []).forEach(c=>{ if(byId[c.noteId]) byId[c.noteId].comments.push(c); });
+    notes = Object.values(byId);
+  }catch(e){
+    showToast('שגיאה בטעינת הלוח מהגיליון');
+  }
+  render();
+}
+
+function render(){
+  const area = document.getElementById('boardArea');
+  if(notes.length === 0){
+    area.innerHTML = `<div class="empty-state">הלוח עדיין ריק.<br>היו הראשונים לשתף 🌿</div>`;
+    return;
+  }
+  const sorted = [...notes].sort((a,b)=>{
+    if(currentSort === 'top'){
+      const scoreA = a.support - a.oppose, scoreB = b.support - b.oppose;
+      return scoreB - scoreA || b.ts - a.ts;
+    }
+    return b.ts - a.ts;
+  });
+
+  const board = document.createElement('div');
+  board.className = 'board';
+  sorted.forEach(n=>{
+    const style = paperColor(n.id);
+    const el = document.createElement('div');
+    el.className = `note ${style.pin}`;
+    el.style.background = `var(--${style.paper})`;
+    el.style.transform = `rotate(${style.rotate}deg)`;
+    const myVote = voteMap.get(n.id);
+    const hasVoted = !!myVote;
+    const commentsOpen = openComments.has(n.id);
+
+    let wantBlock = '';
+    if(n.want && n.want.trim()){
+      wantBlock = `<div class="note-divider"></div><div class="note-want"><div class="note-label">הייתי רוצה לראות</div><div class="note-text want-text"></div></div>`;
+    }
+
+    let commentsHTML = '';
+    if(n.comments.length === 0){
+      commentsHTML = `<div class="vote-gate" style="font-style:normal;">אין עדיין תגובות.</div>`;
+    } else {
+      commentsHTML = n.comments.map(c => `<div class="comment-item"><span class="comment-text"></span>${isAdmin ? `<button class="del-comment-btn" data-note="${n.id}" data-comment="${c.id}">מחקי</button>` : ''}</div>`).join('');
+    }
+
+    const composeHTML = hasVoted
+      ? `<div class="comment-compose">
+           <textarea class="comment-input" data-id="${n.id}" maxlength="300" placeholder="הוסיפו תגובה קצרה..."></textarea>
+           <button class="comment-send" data-id="${n.id}">שליחה</button>
+         </div>`
+      : `<div class="vote-gate">כדי להגיב, סמנו קודם תמיכה או אי-תמיכה בנושא 👆</div>`;
+
+    el.innerHTML = `
+      ${isAdmin ? `<button class="del-note-btn" data-id="${n.id}" title="מחקי פתק">×</button>` : ''}
+      <div class="note-text"></div>
+      ${wantBlock}
+      <div class="vote-row">
+        <button class="vote-btn support ${myVote==='support'?'active':''}" data-id="${n.id}" data-type="support">
+          <svg viewBox="0 0 24 24" fill="${myVote==='support'?'currentColor':'none'}" stroke="currentColor" stroke-width="2"><path d="M12 21s-6.7-4.35-9.3-8.1C1 10 1.6 6.4 4.6 4.9c2.3-1.1 4.7-.2 6 1.6l1.4 2 1.4-2c1.3-1.8 3.7-2.7 6-1.6 3 1.5 3.6 5.1 1.9 8-2.6 3.75-9.3 8.1-9.3 8.1z"/></svg>
+          <span>תומך/ת (${n.support})</span>
+        </button>
+        <button class="vote-btn oppose ${myVote==='oppose'?'active':''}" data-id="${n.id}" data-type="oppose">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          <span>לא תומך/ת (${n.oppose})</span>
+        </button>
+      </div>
+      <div class="note-time">${timeAgo(n.ts)}</div>
+      <div class="comments-toggle" data-id="${n.id}">💬 תגובות (${n.comments.length})</div>
+      <div class="comments-panel ${commentsOpen?'open':''}" data-panel="${n.id}">
+        <div class="comments-list">${commentsHTML}</div>
+        ${composeHTML}
+      </div>
+    `;
+    el.querySelector('.note-text').textContent = n.text;
+    if(n.want && n.want.trim()){
+      el.querySelector('.want-text').textContent = n.want;
+    }
+    const commentTexts = el.querySelectorAll('.comment-text');
+    commentTexts.forEach((span, i) => { span.textContent = n.comments[i].text; });
+
+    board.appendChild(el);
+  });
+  area.innerHTML = '';
+  area.appendChild(board);
+
+  area.querySelectorAll('.vote-btn').forEach(btn=>{ btn.addEventListener('click', onVote); });
+  area.querySelectorAll('.comments-toggle').forEach(el=>{ el.addEventListener('click', onToggleComments); });
+  area.querySelectorAll('.comment-send').forEach(btn=>{ btn.addEventListener('click', onSendComment); });
+  area.querySelectorAll('.del-note-btn').forEach(btn=>{ btn.addEventListener('click', onDeleteNote); });
+  area.querySelectorAll('.del-comment-btn').forEach(btn=>{ btn.addEventListener('click', onDeleteComment); });
+}
+
+async function onVote(e){
+  const btn = e.currentTarget;
+  const id = btn.dataset.id;
+  const type = btn.dataset.type;
+  if(voteMap.has(id)) return; // הצבעה אחת לפתק, פר דפדפן
+  voteMap.set(id, type);
+  saveMyVotes();
+  const note = notes.find(n=>n.id===id);
+  if(note){
+    if(type === 'support') note.support += 1;
+    else note.oppose += 1;
+  }
+  render();
+  try{ await apiCall({ action:'vote', noteId:id, type }); }
+  catch(e){ showToast('שגיאה בשמירת ההצבעה'); }
+}
+
+function onToggleComments(e){
+  const id = e.currentTarget.dataset.id;
+  if(openComments.has(id)) openComments.delete(id);
+  else openComments.add(id);
+  render();
+}
+
+async function onSendComment(e){
+  const btn = e.currentTarget;
+  const id = btn.dataset.id;
+  if(!voteMap.has(id)) return;
+  const panel = document.querySelector(`.comment-input[data-id="${id}"]`);
+  const text = panel.value.trim();
+  if(!text) return;
+  const commentId = 'c_' + Date.now() + '_' + Math.random().toString(36).slice(2,6);
+  const note = notes.find(n=>n.id===id);
+  if(note){ note.comments.push({ id: commentId, text, ts: Date.now() }); }
+  openComments.add(id);
+  render();
+  try{ await apiCall({ action:'addComment', noteId:id, commentId, text }); }
+  catch(e){ showToast('שגיאה בשליחת התגובה'); }
+  showToast('התגובה נוספה 🌿');
+}
+
+async function onDeleteNote(e){
+  const id = e.currentTarget.dataset.id;
+  if(!confirm('למחוק את הפתק הזה לצמיתות?')) return;
+  notes = notes.filter(n => n.id !== id);
+  render();
+  try{ await apiCall({ action:'deleteNote', noteId:id, pw: ADMIN_PASSWORD }); }
+  catch(e){ showToast('שגיאה במחיקה'); }
+  showToast('הפתק נמחק');
+}
+
+async function onDeleteComment(e){
+  const noteId = e.currentTarget.dataset.note;
+  const commentId = e.currentTarget.dataset.comment;
+  const note = notes.find(n => n.id === noteId);
+  if(note){ note.comments = note.comments.filter(c => c.id !== commentId); }
+  render();
+  try{ await apiCall({ action:'deleteComment', noteId, commentId, pw: ADMIN_PASSWORD }); }
+  catch(e){ showToast('שגיאה במחיקת התגובה'); }
+  showToast('התגובה נמחקה');
+}
+
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    currentSort = btn.dataset.sort;
+    render();
+  });
+});
+
+document.getElementById('whyToggle').addEventListener('click', ()=>{
+  document.getElementById('whyText').classList.toggle('open');
+});
+
+const overlay = document.getElementById('overlay');
+const noteInput = document.getElementById('noteInput');
+const wantInput = document.getElementById('wantInput');
+
+document.getElementById('openModalBtn').addEventListener('click', ()=>{
+  overlay.classList.add('open');
+  noteInput.value = '';
+  wantInput.value = '';
+  noteInput.focus();
+});
+document.getElementById('cancelBtn').addEventListener('click', ()=>{
+  overlay.classList.remove('open');
+});
+overlay.addEventListener('click', (e)=>{
+  if(e.target === overlay) overlay.classList.remove('open');
+});
+
+document.getElementById('submitBtn').addEventListener('click', async ()=>{
+  const text = noteInput.value.trim();
+  const want = wantInput.value.trim();
+  if(!text) return;
+  const id = 'n_' + Date.now() + '_' + Math.random().toString(36).slice(2,8);
+  notes.push({ id, text, want, support:0, oppose:0, comments:[], ts: Date.now() });
+  overlay.classList.remove('open');
+  render();
+  try{ await apiCall({ action:'addNote', id, text, want }); }
+  catch(e){ showToast('שגיאה בשמירת הפתק'); }
+  showToast('הפתק עלה ללוח בעילום שם 🌿');
+});
+
+document.getElementById('adminLoginBtn').addEventListener('click', ()=>{
+  if(isAdmin){
+    isAdmin = false;
+    document.getElementById('adminStatus').textContent = '';
+    render();
+    return;
+  }
+  const pw = prompt('סיסמת מנהלת:');
+  if(pw === ADMIN_PASSWORD){
+    isAdmin = true;
+    document.getElementById('adminStatus').textContent = 'מחוברת כמנהלת — ניתן למחוק פתקים ותגובות';
+    render();
+  } else if(pw !== null){
+    showToast('סיסמה שגויה');
+  }
+});
+
+function init(){
+  voterId = getVoterId();
+  loadMyVotes();
+  loadNotes();
+  setInterval(loadNotes, 15000);
+}
+init();
+</script>
+
+</body>
+</html>
