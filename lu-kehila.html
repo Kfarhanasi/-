@@ -136,9 +136,23 @@
   }
   .comment-item:last-child{ border-bottom:none; }
   .comment-text{ flex:1; }
+  .comment-actions{ display:flex; gap:4px; flex-shrink:0; }
+  .edit-comment-btn{
+    background:none; border:none; color: var(--ink-soft); font-size:13px; cursor:pointer; padding:2px 4px;
+  }
   .del-comment-btn{
     background:none; border:none; color: var(--pin-red); font-size:12px; cursor:pointer; padding:2px 4px; flex-shrink:0;
   }
+  .comment-editing{ display:block; }
+  .comment-edit-input{
+    width:100%; min-height:34px; resize:vertical; border:1px solid rgba(0,0,0,0.25); border-radius:4px;
+    padding:6px 8px; font-family:inherit; font-size:13px; background: rgba(255,255,255,0.7); margin-bottom:6px;
+  }
+  .comment-edit-actions{ display:flex; gap:8px; justify-content:flex-end; }
+  .comment-edit-save{
+    background: var(--accent); color:#fff; border:none; border-radius:12px; padding:3px 12px; font-size:12px; cursor:pointer;
+  }
+  .comment-edit-cancel{ background:none; border:none; color: var(--ink-soft); font-size:12px; cursor:pointer; }
   .vote-gate{ font-size:12px; color: var(--ink-soft); font-style:italic; padding: 4px 0; }
   .comment-compose{ display:flex; gap:6px; margin-top:8px; }
   .comment-compose textarea{
@@ -192,6 +206,12 @@
   .del-note-btn{
     position:absolute; top:8px; left:8px; background: rgba(168,64,47,0.9); color:#fff; border:none;
     border-radius:50%; width:22px; height:22px; font-size:13px; line-height:1; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .del-note-btn.own-del{ background: rgba(90,80,65,0.55); }
+  .edit-note-btn{
+    position:absolute; top:8px; left:36px; background: rgba(90,80,65,0.55); color:#fff; border:none;
+    border-radius:50%; width:22px; height:22px; font-size:12px; line-height:1; cursor:pointer;
     display:flex; align-items:center; justify-content:center;
   }
 </style>
@@ -266,6 +286,9 @@ let notes = [];
 let currentSort = 'top';
 let voteMap = new Map();      // noteId -> 'support' | 'oppose'
 let openComments = new Set(); // noteIds with comment panel open
+let commentDrafts = new Map(); // noteId -> טיוטת תגובה שטרם נשלחה
+let editingComments = new Map(); // commentId -> טקסט בעריכה
+let editingNotes = new Map(); // noteId -> {text, want} בעריכה
 let isAdmin = false;
 let voterId = null;
 const ADMIN_PASSWORD = 'כפרהנשיא2026'; // חייב להיות זהה לסיסמה ב-Code.gs
@@ -328,6 +351,12 @@ function showToast(msg){
   setTimeout(()=> t.classList.remove('show'), 2200);
 }
 
+function isUserTyping(){
+  const el = document.activeElement;
+  if(!el) return false;
+  return el.classList && (el.classList.contains('comment-input') || el.classList.contains('comment-edit-input') || el.classList.contains('note-edit-text') || el.classList.contains('note-edit-want'));
+}
+
 async function loadNotes(){
   try{
     const data = await apiCall({ action: 'getData' });
@@ -377,7 +406,26 @@ function render(){
     if(n.comments.length === 0){
       commentsHTML = `<div class="vote-gate" style="font-style:normal;">אין עדיין תגובות.</div>`;
     } else {
-      commentsHTML = n.comments.map(c => `<div class="comment-item"><span class="comment-text"></span>${isAdmin ? `<button class="del-comment-btn" data-note="${n.id}" data-comment="${c.id}">מחקי</button>` : ''}</div>`).join('');
+      commentsHTML = n.comments.map(c => {
+        const isOwner = c.authorId && c.authorId === voterId;
+        const canDelete = isAdmin || isOwner;
+        if(editingComments.has(c.id)){
+          return `<div class="comment-item comment-editing">
+            <textarea class="comment-edit-input" data-note="${n.id}" data-comment="${c.id}" maxlength="300"></textarea>
+            <div class="comment-edit-actions">
+              <button class="comment-edit-save" data-note="${n.id}" data-comment="${c.id}">שמרי</button>
+              <button class="comment-edit-cancel" data-comment="${c.id}">ביטול</button>
+            </div>
+          </div>`;
+        }
+        return `<div class="comment-item">
+          <span class="comment-text" data-comment="${c.id}"></span>
+          <span class="comment-actions">
+            ${isOwner ? `<button class="edit-comment-btn" data-comment="${c.id}" title="ערכי תגובה">✎</button>` : ''}
+            ${canDelete ? `<button class="del-comment-btn" data-note="${n.id}" data-comment="${c.id}" title="מחקי תגובה">מחקי</button>` : ''}
+          </span>
+        </div>`;
+      }).join('');
     }
 
     const composeHTML = hasVoted
@@ -387,8 +435,34 @@ function render(){
          </div>`
       : `<div class="vote-gate">כדי להגיב, סמנו קודם תמיכה או אי-תמיכה בנושא 👆</div>`;
 
+    const isOwnNote = n.authorId && n.authorId === voterId;
+    const editingNote = editingNotes.has(n.id);
+
+    if(editingNote){
+      el.innerHTML = `
+        <div class="field-label" style="margin-top:0;">מה הנושא או האתגר?</div>
+        <textarea class="note-edit-text" data-id="${n.id}" maxlength="500"></textarea>
+        <div class="field-label">מה הייתי רוצה לראות במקום? <span class="opt">(רשות)</span></div>
+        <textarea class="note-edit-want" data-id="${n.id}" maxlength="400"></textarea>
+        <div class="comment-edit-actions" style="margin-top:10px;">
+          <button class="note-edit-save" data-id="${n.id}">שמרי שינויים</button>
+          <button class="note-edit-cancel" data-id="${n.id}">ביטול</button>
+        </div>
+      `;
+      const draft = editingNotes.get(n.id) || { text: n.text, want: n.want || '' };
+      const textTa = el.querySelector('.note-edit-text');
+      const wantTa = el.querySelector('.note-edit-want');
+      textTa.value = draft.text;
+      wantTa.value = draft.want;
+      textTa.addEventListener('input', ()=> editingNotes.set(n.id, { text: textTa.value, want: wantTa.value }));
+      wantTa.addEventListener('input', ()=> editingNotes.set(n.id, { text: textTa.value, want: wantTa.value }));
+      board.appendChild(el);
+      return; // בזמן עריכה לא מציגים הצבעות/תגובות
+    }
+
     el.innerHTML = `
-      ${isAdmin ? `<button class="del-note-btn" data-id="${n.id}" title="מחקי פתק">×</button>` : ''}
+      ${isAdmin ? `<button class="del-note-btn" data-id="${n.id}" title="מחקי פתק">×</button>` : (isOwnNote ? `<button class="del-note-btn own-del" data-id="${n.id}" title="מחקי את הפתק שלי">×</button>` : '')}
+      ${isOwnNote ? `<button class="edit-note-btn" data-id="${n.id}" title="ערכי פתק">✎</button>` : ''}
       <div class="note-text"></div>
       ${wantBlock}
       <div class="vote-row">
@@ -413,7 +487,22 @@ function render(){
       el.querySelector('.want-text').textContent = n.want;
     }
     const commentTexts = el.querySelectorAll('.comment-text');
-    commentTexts.forEach((span, i) => { span.textContent = n.comments[i].text; });
+    commentTexts.forEach(span => {
+      const c = n.comments.find(x => x.id === span.dataset.comment);
+      if(c) span.textContent = c.text;
+    });
+    el.querySelectorAll('.comment-edit-input').forEach(ta => {
+      const cId = ta.dataset.comment;
+      const c = n.comments.find(x => x.id === cId);
+      ta.value = editingComments.get(cId) !== undefined ? editingComments.get(cId) : (c ? c.text : '');
+      ta.addEventListener('input', ()=> editingComments.set(cId, ta.value));
+    });
+    const draftInput = el.querySelector('.comment-input');
+    if(draftInput){
+      const draft = commentDrafts.get(n.id);
+      if(draft) draftInput.value = draft;
+      draftInput.addEventListener('input', ()=> commentDrafts.set(n.id, draftInput.value));
+    }
 
     board.appendChild(el);
   });
@@ -425,22 +514,40 @@ function render(){
   area.querySelectorAll('.comment-send').forEach(btn=>{ btn.addEventListener('click', onSendComment); });
   area.querySelectorAll('.del-note-btn').forEach(btn=>{ btn.addEventListener('click', onDeleteNote); });
   area.querySelectorAll('.del-comment-btn').forEach(btn=>{ btn.addEventListener('click', onDeleteComment); });
+  area.querySelectorAll('.edit-comment-btn').forEach(btn=>{ btn.addEventListener('click', onEditCommentStart); });
+  area.querySelectorAll('.comment-edit-save').forEach(btn=>{ btn.addEventListener('click', onEditCommentSave); });
+  area.querySelectorAll('.comment-edit-cancel').forEach(btn=>{ btn.addEventListener('click', onEditCommentCancel); });
+  area.querySelectorAll('.edit-note-btn').forEach(btn=>{ btn.addEventListener('click', onEditNoteStart); });
+  area.querySelectorAll('.note-edit-save').forEach(btn=>{ btn.addEventListener('click', onEditNoteSave); });
+  area.querySelectorAll('.note-edit-cancel').forEach(btn=>{ btn.addEventListener('click', onEditNoteCancel); });
 }
 
 async function onVote(e){
   const btn = e.currentTarget;
   const id = btn.dataset.id;
   const type = btn.dataset.type;
-  if(voteMap.has(id)) return; // הצבעה אחת לפתק, פר דפדפן
-  voteMap.set(id, type);
-  saveMyVotes();
   const note = notes.find(n=>n.id===id);
-  if(note){
-    if(type === 'support') note.support += 1;
-    else note.oppose += 1;
+  const current = voteMap.get(id);
+
+  if(current === type){
+    // לחיצה שוב על אותו כפתור = ביטול ההצבעה
+    voteMap.delete(id);
+    if(note){ if(type==='support') note.support = Math.max(0, note.support-1); else note.oppose = Math.max(0, note.oppose-1); }
+  } else if(current){
+    // לחיצה על הכפתור השני = החלפת צד
+    voteMap.set(id, type);
+    if(note){
+      if(current==='support') note.support = Math.max(0, note.support-1); else note.oppose = Math.max(0, note.oppose-1);
+      if(type==='support') note.support += 1; else note.oppose += 1;
+    }
+  } else {
+    // הצבעה ראשונה
+    voteMap.set(id, type);
+    if(note){ if(type==='support') note.support += 1; else note.oppose += 1; }
   }
+  saveMyVotes();
   render();
-  try{ await apiCall({ action:'vote', noteId:id, type }); }
+  try{ await apiCall({ action:'vote', noteId:id, type, voterId }); }
   catch(e){ showToast('שגיאה בשמירת ההצבעה'); }
 }
 
@@ -460,12 +567,72 @@ async function onSendComment(e){
   if(!text) return;
   const commentId = 'c_' + Date.now() + '_' + Math.random().toString(36).slice(2,6);
   const note = notes.find(n=>n.id===id);
-  if(note){ note.comments.push({ id: commentId, text, ts: Date.now() }); }
+  if(note){ note.comments.push({ id: commentId, text, ts: Date.now(), authorId: voterId }); }
+  commentDrafts.delete(id);
   openComments.add(id);
   render();
-  try{ await apiCall({ action:'addComment', noteId:id, commentId, text }); }
+  try{ await apiCall({ action:'addComment', noteId:id, commentId, text, authorId: voterId }); }
   catch(e){ showToast('שגיאה בשליחת התגובה'); }
   showToast('התגובה נוספה 🌿');
+}
+
+function onEditCommentStart(e){
+  const commentId = e.currentTarget.dataset.comment;
+  editingComments.set(commentId, undefined);
+  render();
+}
+
+function onEditCommentCancel(e){
+  const commentId = e.currentTarget.dataset.comment;
+  editingComments.delete(commentId);
+  render();
+}
+
+async function onEditCommentSave(e){
+  const btn = e.currentTarget;
+  const noteId = btn.dataset.note;
+  const commentId = btn.dataset.comment;
+  const ta = document.querySelector(`.comment-edit-input[data-comment="${commentId}"]`);
+  const text = ta.value.trim();
+  if(!text) return;
+  const note = notes.find(n => n.id === noteId);
+  if(note){
+    const c = note.comments.find(x => x.id === commentId);
+    if(c) c.text = text;
+  }
+  editingComments.delete(commentId);
+  render();
+  try{ await apiCall({ action:'editComment', noteId, commentId, text, authorId: voterId }); }
+  catch(e){ showToast('שגיאה בשמירת העריכה'); }
+  showToast('התגובה עודכנה');
+}
+
+function onEditNoteStart(e){
+  const id = e.currentTarget.dataset.id;
+  editingNotes.set(id, null); // ימולא ב-render מהערכים הקיימים
+  render();
+}
+
+function onEditNoteCancel(e){
+  const id = e.currentTarget.dataset.id;
+  editingNotes.delete(id);
+  render();
+}
+
+async function onEditNoteSave(e){
+  const id = e.currentTarget.dataset.id;
+  const textTa = document.querySelector(`.note-edit-text[data-id="${id}"]`);
+  const wantTa = document.querySelector(`.note-edit-want[data-id="${id}"]`);
+  const text = textTa.value.trim();
+  const want = wantTa.value.trim();
+  if(!text) return;
+  const note = notes.find(n => n.id === id);
+  if(note){ note.text = text; note.want = want; }
+  editingNotes.delete(id);
+  render();
+  try{ await apiCall({ action:'editNote', id, text, want, authorId: voterId }); }
+  catch(e){ showToast('שגיאה בשמירת העריכה'); }
+  showToast('הפתק עודכן');
 }
 
 async function onDeleteNote(e){
@@ -473,7 +640,12 @@ async function onDeleteNote(e){
   if(!confirm('למחוק את הפתק הזה לצמיתות?')) return;
   notes = notes.filter(n => n.id !== id);
   render();
-  try{ await apiCall({ action:'deleteNote', noteId:id, pw: ADMIN_PASSWORD }); }
+  try{
+    const params = { action:'deleteNote', noteId:id };
+    if(isAdmin) params.pw = ADMIN_PASSWORD;
+    else params.authorId = voterId;
+    await apiCall(params);
+  }
   catch(e){ showToast('שגיאה במחיקה'); }
   showToast('הפתק נמחק');
 }
@@ -484,7 +656,12 @@ async function onDeleteComment(e){
   const note = notes.find(n => n.id === noteId);
   if(note){ note.comments = note.comments.filter(c => c.id !== commentId); }
   render();
-  try{ await apiCall({ action:'deleteComment', noteId, commentId, pw: ADMIN_PASSWORD }); }
+  try{
+    const params = { action:'deleteComment', noteId, commentId };
+    if(isAdmin) params.pw = ADMIN_PASSWORD;
+    else params.authorId = voterId;
+    await apiCall(params);
+  }
   catch(e){ showToast('שגיאה במחיקת התגובה'); }
   showToast('התגובה נמחקה');
 }
@@ -524,10 +701,10 @@ document.getElementById('submitBtn').addEventListener('click', async ()=>{
   const want = wantInput.value.trim();
   if(!text) return;
   const id = 'n_' + Date.now() + '_' + Math.random().toString(36).slice(2,8);
-  notes.push({ id, text, want, support:0, oppose:0, comments:[], ts: Date.now() });
+  notes.push({ id, text, want, support:0, oppose:0, comments:[], ts: Date.now(), authorId: voterId });
   overlay.classList.remove('open');
   render();
-  try{ await apiCall({ action:'addNote', id, text, want }); }
+  try{ await apiCall({ action:'addNote', id, text, want, authorId: voterId }); }
   catch(e){ showToast('שגיאה בשמירת הפתק'); }
   showToast('הפתק עלה ללוח בעילום שם 🌿');
 });
@@ -553,7 +730,10 @@ function init(){
   voterId = getVoterId();
   loadMyVotes();
   loadNotes();
-  setInterval(loadNotes, 15000);
+  setInterval(()=>{
+    if(isUserTyping()) return; // לא מרעננים תוך כדי שמישהו מקליד תגובה
+    loadNotes();
+  }, 15000);
 }
 init();
 </script>
